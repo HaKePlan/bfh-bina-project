@@ -50,9 +50,10 @@ notebook but not modelled.
 │   ├── integration/                 # Tests that require a running DB
 │   └── fixtures/
 │       └── 2024-01-01_istdaten.csv  # Real SBB CSV used for parser unit tests
-└── raw/                             # Temp working directory — auto-created, never committed
-    ├── sbb/                         # SBB ZIPs and extracted CSVs (deleted after processing)
-    └── meteo/                       # MeteoSwiss CSVs (deleted after processing)
+├── raw/                             # Temp working directory — auto-created, never committed
+│   ├── sbb/                         # SBB ZIPs and extracted CSVs (deleted after processing)
+│   └── meteo/                       # MeteoSwiss CSVs (deleted after processing)
+└── logs/                            # Log files from collection runs — auto-created, never committed
 ```
 
 **Rules Copilot must always follow for the repository structure:**
@@ -309,8 +310,15 @@ python collect_sbb.py --start-year 2024 --end-year 2025 --months 10,11 --debug
 **Processing steps per month:**
 
 1. Check `processing_log`: skip if this month already has a `success` entry.
-2. Download `ist-daten-{YYYY}-{MM}.zip` to `raw/sbb/` with tqdm progress bar.
-3. For each daily CSV inside the ZIP:
+2. Check available disk space in `raw/sbb/`. If less than 10 GB free, abort
+   immediately with a clear error message. Do not attempt the download.
+3. Download `ist-daten-{YYYY}-{MM}.zip` to `raw/sbb/` with tqdm progress bar.
+   - If a partial ZIP already exists from a previous failed run, delete it first.
+   - Retry failed downloads up to 3 times with exponential backoff
+     (wait 10s, 30s, 90s between attempts).
+   - If all 3 retries fail, log the error, write an `error` entry to
+     `processing_log`, and continue with the next month.
+4. For each daily CSV inside the ZIP:
    a. Read only the required columns (see Section 4).
    b. Filter to `PRODUKT_ID == 'Zug'` and `HALTESTELLEN_NAME` in `TARGET_STATIONS`
       and `AN_PROGNOSE_STATUS == 'REAL'` and `FAELLT_AUS_TF == False`.
@@ -325,8 +333,11 @@ python collect_sbb.py --start-year 2024 --end-year 2025 --months 10,11 --debug
       Apply NULL fill strategy as defined in Section 3.
    g. Collect all rows for the month, then bulk-insert into `train_connections`
       using upsert on `(fahrt_bezeichner, scheduled_arrival)`.
-4. Log the result to `processing_log`.
-5. Delete the ZIP and any extracted files unless `--debug`.
+5. Open a fresh database connection for each month's insert. Do not reuse a
+   connection across months — long-running connections can time out over a
+   multi-hour run.
+6. Log the result to `processing_log`.
+7. Delete the ZIP and any extracted files unless `--debug`.
 
 **stdout layout:**
 
@@ -352,6 +363,26 @@ Rows in precipitation_10min:  262800
 - The download and processing bars use `position=1` and `leave=False` so they
   are replaced by the next bar when done.
 - A blank line is printed before and after each month block using `tqdm.write()`.
+
+**Log file:**
+- In addition to stdout, write all log output to `logs/collection_YYYYMMDD_HHMMSS.log`
+  where the timestamp is the moment the script started.
+- Create the `logs/` directory automatically if it does not exist.
+- `logs/` must be added to `.gitignore`.
+- The log file captures everything the `logging` module emits (INFO and above).
+  tqdm output is not duplicated into the log file.
+
+**Running unattended on a remote VM:**
+- The README must include instructions for running the script detached via `tmux`:
+  ```bash
+  tmux new -s sbb_collection
+  python collect_sbb.py --start-year 2024 --end-year 2025
+  # Detach with Ctrl+B then D
+  # Reattach later with: tmux attach -t sbb_collection
+  ```
+- The README must note that if the process is interrupted, it can be safely
+  restarted with the same flags — completed months will be skipped automatically
+  via `processing_log`.
 
 ---
 
@@ -546,6 +577,7 @@ Specifically:
 ### `.gitignore` (mandatory entries)
 ```
 raw/
+logs/
 .env
 .env.test
 __pycache__/

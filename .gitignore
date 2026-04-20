@@ -199,3 +199,4 @@ raw/
 # Only ignore the 313MB SBB istdaten file - MeteoSwiss file is ~41MB and committed
 tests/fixtures/2024-01-01_istdaten.csv
 
+logs/

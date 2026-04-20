@@ -11,6 +11,7 @@ import io
 import logging
 import os
 import shutil
+import sys
 from datetime import datetime
 
 import pandas as pd
@@ -19,9 +20,19 @@ from tqdm import tqdm
 
 from scripts.db_utils import get_db_connection, log_processing_result
 
+# Create logs directory
+LOGS_DIR = "logs"
+os.makedirs(LOGS_DIR, exist_ok=True)
+
+# Setup logging to file and console
+log_filename = os.path.join(LOGS_DIR, f"collection_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log")
 logging.basicConfig(
     level=logging.INFO,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    handlers=[
+        logging.FileHandler(log_filename),
+        logging.StreamHandler()
+    ]
 )
 logger = logging.getLogger(__name__)
 
@@ -219,6 +230,7 @@ def main():
     args = parser.parse_args()
 
     logger.info("Starting MeteoSwiss precipitation data load")
+    logger.info(f"Log file: {log_filename}")
 
     try:
         # Create output directory
@@ -233,7 +245,7 @@ def main():
             total_rows += rows
 
         # Print summary
-        print(f"\n---\nTotal rows inserted: {total_rows}")
+        logger.info(f"---\nTotal rows inserted: {total_rows}")
 
         conn.close()
 

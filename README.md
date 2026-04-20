@@ -147,6 +147,32 @@ python scripts/collect_sbb.py --start-year 2024 --end-year 2024 --months 1,2
 python scripts/collect_sbb.py --start-year 2024 --end-year 2025 --months 10,11 --debug
 ```
 
+**Running unattended (on a remote VM):**
+
+Use `tmux` to run the script detached:
+
+```bash
+# Start a new tmux session
+tmux new -s sbb_collection
+
+# Inside the tmux session, run the collection script
+python scripts/collect_sbb.py --start-year 2024 --end-year 2025
+
+# Detach from the session (keep it running): Ctrl+B then D
+
+# Later, reattach to check progress
+tmux attach -t sbb_collection
+
+# If interrupted, the script can be safely restarted with the same flags
+# Processing log tracks completed months, so restarting skips already-processed data
+```
+
+**Important notes:**
+- The script creates a log file in `logs/collection_YYYYMMDD_HHMMSS.log` automatically
+- If the process is interrupted, restarting with the same flags is safe — the processing log tracks completed months
+- The script checks for at least 10 GB free disk space before each download
+- Downloads retry up to 3 times with exponential backoff (10s, 30s, 90s)
+
 ### `reset_db.py`
 
 Drop and recreate database schema from `db/init.sql`:
