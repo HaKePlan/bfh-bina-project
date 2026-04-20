@@ -190,3 +190,12 @@ cython_debug/
 #  option (not recommended) you can uncomment the following to ignore the entire idea folder.
 #.idea/
 
+### Project-specific
+raw/
+.env.test
+.DS_Store
+
+# Test fixtures (too large for GitHub, downloaded on demand)
+# Only ignore the 313MB SBB istdaten file - MeteoSwiss file is ~41MB and committed
+tests/fixtures/2024-01-01_istdaten.csv
+

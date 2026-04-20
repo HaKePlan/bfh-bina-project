@@ -1,0 +1,9 @@
+[project]
+name = "sbb-precipitation-analysis"
+version = "0.1.0"
+description = "Business Intelligence study on precipitation and train delays"
+requires-python = ">=3.10"
+
+
+
+
