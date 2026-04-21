@@ -10,11 +10,11 @@ import argparse
 import io
 import logging
 import os
+import subprocess
 import shutil
 import sys
 import time
 from datetime import datetime
-from zipfile import ZipFile
 
 import requests
 from tqdm import tqdm
@@ -130,19 +130,44 @@ def process_month(year: int, month: int, debug: bool = False) -> int:
 
         try:
             all_records = []
+            zip_path = os.path.join(RAW_DIR, f"ist-daten-{period}.zip")
+            extract_dir = os.path.join(RAW_DIR, f"ist-daten-{period}")
+
+            with open(zip_path, "wb") as zip_file:
+                zip_file.write(zip_data)
+
+            os.makedirs(extract_dir, exist_ok=True)
+
+            subprocess.run([
+                "unzip",
+                "-oq",
+                zip_path,
+                "-d",
+                extract_dir,
+            ], check=True)
 
             # Extract and process daily CSVs
-            with ZipFile(io.BytesIO(zip_data)) as zf:
-                csv_files = [f for f in zf.namelist() if f.endswith("_istdaten.csv")]
+            csv_files = [
+                os.path.join(extract_dir, f)
+                for f in os.listdir(extract_dir)
+                if f.lower().endswith("_istdaten.csv")
+            ]
 
-                for csv_file in tqdm(csv_files, desc=f"Processing {period}", leave=False):
-                    try:
-                        csv_content = zf.read(csv_file).decode("utf-8")
-                        records = parse_sbb_csv(csv_content, period)
-                        all_records.extend(records)
-                    except Exception as e:
-                        logger.warning(f"Failed to process {csv_file}: {e}")
-                        continue
+            if not csv_files:
+                logger.warning(
+                    f"No daily CSV files matched the expected pattern in {period}. "
+                    "The archive may use a different filename casing or structure."
+                )
+
+            for csv_file in tqdm(csv_files, desc=f"Processing {period}", leave=False):
+                try:
+                    with open(csv_file, "r", encoding="utf-8") as file_handle:
+                        csv_content = file_handle.read()
+                    records = parse_sbb_csv(csv_content, period)
+                    all_records.extend(records)
+                except Exception as e:
+                    logger.warning(f"Failed to process {csv_file}: {e}")
+                    continue
 
             # Load precipitation cache once (much faster than per-record queries)
             logger.info(f"Loading precipitation data for {period}...")

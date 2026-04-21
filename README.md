@@ -73,14 +73,16 @@ pip install -r scripts/requirements.txt
 
 ```bash
 # Load MeteoSwiss precipitation data
-python scripts/load_meteo.py
+python -m scripts.load_meteo
 
 # Download and process SBB train data for 2024-2025
-python scripts/collect_sbb.py --start-year 2024 --end-year 2025
+python -m scripts.collect_sbb --start-year 2024 --end-year 2025
 
 # Or for a quick test run (Jan-Feb 2024)
-python scripts/collect_sbb.py --start-year 2024 --end-year 2024 --months 1,2
+python -m scripts.collect_sbb --start-year 2024 --end-year 2024 --months 1,2
 ```
+
+**Important:** Always use `python -m scripts.module_name` syntax (not `python scripts/module_name.py`) to ensure proper module resolution, especially on remote VMs.
 
 ### 5. Run analysis notebook
 
@@ -116,7 +118,7 @@ See `db/init.sql` for the complete schema definition.
 Download MeteoSwiss precipitation data (SMA, BAS, BER stations):
 
 ```bash
-python scripts/load_meteo.py [--debug]
+python -m scripts.load_meteo [--debug]
 ```
 
 - `--debug`: Keep CSV files in `raw/meteo/` after processing
@@ -126,7 +128,7 @@ python scripts/load_meteo.py [--debug]
 Download and process SBB monthly archives:
 
 ```bash
-python scripts/collect_sbb.py --start-year YYYY --end-year YYYY [--months M,M] [--debug]
+python -m scripts.collect_sbb --start-year YYYY --end-year YYYY [--months M,M] [--debug]
 ```
 
 - `--start-year`: First year (e.g. 2024)
@@ -138,13 +140,13 @@ python scripts/collect_sbb.py --start-year YYYY --end-year YYYY [--months M,M] [
 
 ```bash
 # Full 2024-2025 range
-python scripts/collect_sbb.py --start-year 2024 --end-year 2025
+python -m scripts.collect_sbb --start-year 2024 --end-year 2025
 
 # Jan-Feb 2024 only
-python scripts/collect_sbb.py --start-year 2024 --end-year 2024 --months 1,2
+python -m scripts.collect_sbb --start-year 2024 --end-year 2024 --months 1,2
 
 # Oct-Nov both years, keep files
-python scripts/collect_sbb.py --start-year 2024 --end-year 2025 --months 10,11 --debug
+python -m scripts.collect_sbb --start-year 2024 --end-year 2025 --months 10,11 --debug
 ```
 
 **Running unattended (on a remote VM):**
@@ -178,7 +180,7 @@ tmux attach -t sbb_collection
 Drop and recreate database schema from `db/init.sql`:
 
 ```bash
-python scripts/reset_db.py --database <name> [--yes]
+python -m scripts.reset_db --database <name> [--yes]
 ```
 
 - `--database`: Database name (required, no default)
@@ -188,10 +190,10 @@ python scripts/reset_db.py --database <name> [--yes]
 
 ```bash
 # Interactive reset
-python scripts/reset_db.py --database sbb_precipitation
+python -m scripts.reset_db --database sbb_precipitation
 
 # Non-interactive reset (used by tests)
-python scripts/reset_db.py --database sbb_precipitation_test --yes
+python -m scripts.reset_db --database sbb_precipitation_test --yes
 ```
 
 ---
