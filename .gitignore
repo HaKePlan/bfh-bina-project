@@ -193,6 +193,7 @@ cython_debug/
 ### Project-specific
 raw/
 .env.test
+.env.prod
 .DS_Store
 
 # Test fixtures (too large for GitHub, downloaded on demand)
