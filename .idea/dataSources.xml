@@ -8,5 +8,12 @@
       <jdbc-url>jdbc:postgresql://localhost:5432/sbb_precipitation</jdbc-url>
       <working-dir>$ProjectFileDir$</working-dir>
     </data-source>
+    <data-source source="LOCAL" name="sbb_precipitation@bina01.srv.pfuetze.xyz" uuid="88477421-a6bf-43b6-9ca2-72772066ecbf">
+      <driver-ref>postgresql</driver-ref>
+      <synchronize>true</synchronize>
+      <jdbc-driver>org.postgresql.Driver</jdbc-driver>
+      <jdbc-url>jdbc:postgresql://bina01.srv.pfuetze.xyz:5432/sbb_precipitation</jdbc-url>
+      <working-dir>$ProjectFileDir$</working-dir>
+    </data-source>
   </component>
 </project>

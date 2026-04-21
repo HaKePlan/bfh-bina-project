@@ -1,0 +1,19 @@
+{
+  "model_type": "Random Forest",
+  "subset": "all_data",
+  "categories_included": [
+    "dry",
+    "light",
+    "moderate",
+    "heavy"
+  ],
+  "subset_rationale": "all_data selected because rain-only and core-rain subsets produce worse R\u00b2 by removing the dry vs wet contrast \u2014 the only meaningful precipitation signal in the data.",
+  "MAE": 1.3396,
+  "RMSE": 3.8516,
+  "R2": 0.0,
+  "trained_at": "2026-04-21T12:13:30.804543+00:00",
+  "n_training_samples": 1092567,
+  "n_test_samples": 273142,
+  "feature": "median_precip_mm",
+  "target": "arrival_delay_min"
+}

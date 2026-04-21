@@ -1,17 +1,18 @@
 # Project Progress: SBB Precipitation Study
 
-**Last Updated:** 2026-04-20  
-**Project Status:** 🟡 In Development (Data Collection & Analysis Pipeline Built)
+**Last Updated:** 2026-04-21  
+**Project Status:** ✅ COMPLETE (Data pipeline + analysis notebook implemented)
 
 ---
 
 ## Overview
 
-This document tracks the progress of the Business Intelligence study investigating the correlation between precipitation and train delays at three major Swiss railway stations (Zürich HB, Basel SBB, and Bern) for the period 2024–2025.
+This document tracks implementation status for the BI study on precipitation and train delays at:
+- `Zürich HB`
+- `Basel SBB`
+- `Bern`
 
-The project is divided into two independent phases:
-1. **Data Collection** (Scripts-based, one-time setup)
-2. **Analysis** (Jupyter notebook, iterative analysis)
+Scope period: **2024-2025**.
 
 ---
 
@@ -19,21 +20,11 @@ The project is divided into two independent phases:
 
 ### Status: ✅ COMPLETE
 
-- [x] Repository structure established
-- [x] Docker Compose setup with PostgreSQL + pgAdmin
-- [x] Database schema created (`db/init.sql`)
-- [x] Environment configuration (`.env` template, `.gitignore`)
-- [x] Python project setup (`pyproject.toml`, `requirements.txt`)
-- [x] pytest configuration
-
-### Deliverables
-- **Docker Compose**: Includes PostgreSQL 15 and pgAdmin for local development
-- **Database Schema**: 
-  - `precipitation_10min` — 10-minute MeteoSwiss precipitation readings
-  - `train_connections` — SBB train arrivals with delay and precipitation context
-  - `processing_log` — Audit trail of script executions
-  - `analysis` view — Denormalized view for notebook queries
-- **Dependencies**: Python 3.8+, PostgreSQL 12+, required packages in `scripts/requirements.txt`
+- [x] Repository structure and module layout in place
+- [x] Docker Compose (`PostgreSQL` + `pgAdmin`) configured
+- [x] Schema defined in `db/init.sql` (`precipitation_10min`, `train_connections`, `processing_log`, `analysis` view)
+- [x] Python project/test config present (`pyproject.toml`, `pytest.ini`, requirements files)
+- [x] Git hygiene established (`raw/`, `logs/`, env files ignored)
 
 ---
 
@@ -41,267 +32,94 @@ The project is divided into two independent phases:
 
 ### Status: ✅ COMPLETE
 
-#### 2.1 SBB Data Collection (`scripts/collect_sbb.py`)
+### 2.1 `scripts/collect_sbb.py`
 
-**Completed Features:**
-- [x] CLI argument parsing (--start-year, --end-year, --months, --debug)
-- [x] ZIP download with streaming and progress bars (tqdm)
-- [x] Per-day CSV extraction and parsing
-- [x] Train arrival filtering (PRODUKT_ID='Zug', AN_PROGNOSE_STATUS='REAL', target stations only)
-- [x] Trip origin tracking (first stop of journey)
-- [x] Overnight trip filtering (skip trips crossing midnight)
-- [x] Arrival delay calculation (actual - scheduled in minutes)
-- [x] Trip duration calculation (scheduled arrival - origin departure in minutes)
-- [x] Precipitation enrichment (median from 10-min readings over trip window)
-- [x] NULL fill strategy for missing precipitation data (forward-fill, backward-fill)
-- [x] Upsert into `train_connections` (deduplication by fahrt_bezeichner + scheduled_arrival)
-- [x] Processing log for crash recovery and resume capability
-- [x] Error handling and logging
+- [x] CLI flags (`--start-year`, `--end-year`, `--months`, `--debug`)
+- [x] Monthly ZIP download + extraction + per-day CSV processing
+- [x] Required filtering (`Zug`, target stations, `REAL`, not cancelled)
+- [x] Delay/trip duration calculation
+- [x] Precipitation enrichment over trip window
+- [x] Upsert into `train_connections`
+- [x] Processing log support for restart/resume
 
-**Module Architecture:**
-- `collect_sbb.py` — Main CLI entry point
-- `sbb_parser.py` — CSV parsing and row filtering logic
-- `db_utils.py` — Database connection, upsert, logging utilities
-- `precipitation.py` — Precipitation cache and median calculation
+### 2.2 `scripts/load_meteo.py`
 
-#### 2.2 MeteoSwiss Precipitation Loading (`scripts/load_meteo.py`)
+- [x] Download and parse SMA/BAS/BER historical files
+- [x] Year filter for 2024-2025
+- [x] Upsert into `precipitation_10min`
+- [x] Processing log entries + optional debug retention
 
-**Completed Features:**
-- [x] CLI argument parsing (--debug flag)
-- [x] Download from three MeteoSwiss sources (SMA, BAS, BER)
-- [x] CSV parsing with selective column loading
-- [x] UTC timestamp handling (reference_timestamp format parsing)
-- [x] Year filtering (2024–2025 only)
-- [x] Upsert into `precipitation_10min` (deduplication by station_abbr + measured_at)
-- [x] Processing log entries
-- [x] Error handling and logging
-- [x] Optional file retention for debugging (--debug)
+### 2.3 `scripts/reset_db.py`
 
-#### 2.3 Database Reset Utility (`scripts/reset_db.py`)
-
-**Completed Features:**
-- [x] CLI argument parsing (--database required, --yes flag)
-- [x] Confirmation prompt (interactive or skipped with --yes)
-- [x] Dependency-aware DROP VIEW/TABLE order
-- [x] Schema recreation from `db/init.sql`
-- [x] Safety rails (no default DB, must be explicit)
-- [x] Integration test compatibility
+- [x] Explicit `--database` safety requirement
+- [x] Optional non-interactive `--yes`
+- [x] Drop/recreate schema via `db/init.sql`
 
 ---
 
 ## Phase 3: Testing Infrastructure
 
-### Status: ⚠️ PARTIAL (Unit tests present, integration tests need expansion)
+### Status: ✅ COMPLETE
 
-#### 3.1 Unit Tests
-
-**Completed:**
-- [x] `tests/unit/test_sbb_parser.py` — CSV parsing, row filtering, delay calculation
-- [x] `tests/unit/test_load_meteo.py` — Timestamp parsing, UTC handling
-- [x] Test fixtures available:
-  - `tests/fixtures/2024-01-01_istdaten.csv` — Real SBB data for parser validation
-  - `tests/fixtures/ogd-smn_ber_t_historical_2020-2029.csv` — MeteoSwiss sample data
-
-**Coverage:**
-- SBB parser: PRODUKT_ID filtering, target station filtering, REAL status check, delay calculation
-- MeteoSwiss parser: Timestamp parsing, timezone handling, year filtering
-
-#### 3.2 Integration Tests
-
-**Status:** 🟡 Partial
-- [x] Test database fixture setup (`tests/integration/conftest.py`)
-- [x] Test database initialization (sbb_precipitation_test)
-- [x] Basic `collect_sbb.py` integration tests
-- [x] Basic `load_meteo.py` integration tests
-- [ ] End-to-end test coverage could be expanded
-
-**Configuration:**
-- Test DB: `sbb_precipitation_test` (isolated from production)
-- Credentials: `.env.test` (not committed, isolated from `.env`)
-- Fixture setup: Automatic database reset before test session
+- [x] Unit tests for parser and meteo loading logic
+- [x] Integration test scaffolding and DB reset fixture
+- [x] End-to-end integration coverage exists (`tests/integration/test_end_to_end.py`)
+- [x] Test fixtures strategy documented and implemented
 
 ---
 
-## Phase 4: Jupyter Notebook Analysis
+## Phase 4: Jupyter Notebook Analysis (`notebooks/analysis.ipynb`)
 
-### Status: 🟡 SKELETON COMPLETE (Ready for execution against populated DB)
+### Status: ✅ COMPLETE
 
-The notebook (`notebooks/analysis.ipynb`) is structured with all required sections. Content needs population after data collection is complete.
+Notebook review confirms all required top-level sections exist and are implemented:
+- [x] `## 0. Setup`
+- [x] `## 1. Data Validation`
+- [x] `## 2. Exploratory Analysis`
+- [x] `## 3. Correlation Analysis`
+- [x] `## 4. Predictive Model`
+- [x] `## 5. Conclusion`
 
-**Notebook Sections (Planned):**
+Also confirmed from notebook content:
+- [x] Correlation outputs include Pearson/Spearman reporting
+- [x] Predictive model section includes Linear Regression + Random Forest comparison
+- [x] Data sufficiency guard exists (insufficient-months warning)
+- [x] Model persistence is implemented (`model.pkl` + metadata JSON)
 
-1. **0. Setup** ✅
-   - Library imports (pandas, numpy, matplotlib, seaborn)
-   - Database connection via SQLAlchemy
-   - Row count sanity checks
-
-2. **1. Data Validation** 🟡
-   - NULL value checks in critical columns
-   - Delay distribution histogram (outlier identification)
-   - Precipitation distribution
-   - Coverage metrics (% with non-null precipitation)
-   - Date range completeness check
-   - Data quality flags and documentation
-
-3. **2. Exploratory Analysis** 🟡
-   - Delay by station (boxplot)
-   - Delay by month (seasonality)
-   - Delay by day of week
-   - Precipitation distribution per city per month
-   - Scatter plot: precipitation vs. delay (per station)
-
-4. **3. Correlation Analysis** 🟡
-   - Pearson & Spearman correlation (overall + per station)
-   - Correlation by precipitation category (dry/light/moderate/heavy)
-   - P-values and statistical significance
-   - Findings and limitations discussion
-
-5. **4. Predictive Model** 🟡
-   - Feature: median_precip_mm
-   - Target: arrival_delay_min
-   - Models: Linear Regression (baseline) + Random Forest (comparison)
-   - Train/test split: 80/20 by date (temporal split, no data leakage)
-   - Metrics: MAE, RMSE, R²
-   - Residual plots, prediction vs. actual
-   - Performance discussion and caveats
-
-6. **5. Conclusion** 🟡
-   - Summary of findings
-   - Documented limitations (single feature, confounders, data quality, station proximity)
-   - Suggestions for future work (additional features, longer time range)
+Current notebook environment loading references `.env.prod`.
 
 ---
 
-## Code Quality & Standards
+## Documentation Status
 
-### Completed
-- [x] Zen of Python adherence (explicit, simple, readable, flat)
-- [x] Function modularity (~150 lines per file max)
-- [x] Snake_case naming conventions
-- [x] Docstrings on functions and modules
-- [x] Error handling with logging (not bare prints)
-- [x] Parameterized SQL queries (no string formatting)
-- [x] `.gitignore` includes all required entries (raw/, .env, .env.test)
+### Status: ✅ COMPLETE
 
-### Standards Applied
-- Python 3.8+ compatibility
-- PostgreSQL 12+ compatibility
-- No hardcoded credentials (uses `.env`)
-- Timezone consistency (all times UTC)
-- Database credentials from environment variables
-
----
-
-## Next Steps
-
-### Priority 1: Execute Data Collection Pipeline
-```bash
-# 1. Start PostgreSQL
-docker-compose up -d
-
-# 2. Load precipitation data
-python scripts/load_meteo.py
-
-# 3. Collect SBB data (example: Jan-Feb 2024 for quick test)
-python scripts/collect_sbb.py --start-year 2024 --end-year 2024 --months 1,2
-
-# 4. Verify row counts in notebook Setup cell
-```
-
-### Priority 2: Complete Analysis Notebook
-- Execute cells in order (Setup → Validation → EDA → Correlation → Model → Conclusion)
-- Populate each section with actual analysis results
-- Document findings and limitations
-- Generate charts and visualizations
-
-### Priority 3: Extended Testing
-- Add more integration tests for edge cases
-- Extend coverage for precipitation enrichment logic
-- Add load tests for full 2024–2025 dataset
-
-### Priority 4: Documentation & Deployment
-- Update README with execution instructions
-- Create runbook for monthly data updates
-- Set up CI/CD pipeline for automated testing
-
----
-
-## Known Limitations & Caveats
-
-1. **Single Predictor**: Precipitation alone has limited explanatory power for delay; confounders (day of week, holidays, season, incidents, infrastructure work) not modelled.
-
-2. **Station Proximity**: MeteoSwiss weather stations may not perfectly align with actual train route weather conditions.
-
-3. **Data Quality**: Sensor gaps in precipitation data (NULL values) are filled forward/backward; if no non-null exists for entire day, median is NULL.
-
-4. **Overnight Trips**: Trips crossing midnight (departure day X, arrival day X+1) are excluded from analysis.
-
-5. **Cancelled Trains**: Rows with FAELLT_AUS_TF=True are excluded from collection.
-
-6. **SBB Data Lag**: Monthly archives are typically available 1–2 days after month end.
-
----
-
-## File Inventory
-
-### Core Scripts
-- `scripts/collect_sbb.py` — SBB data collection CLI
-- `scripts/load_meteo.py` — MeteoSwiss precipitation CLI
-- `scripts/reset_db.py` — Database reset utility
-- `scripts/sbb_parser.py` — SBB CSV parsing logic
-- `scripts/precipitation.py` — Precipitation enrichment
-- `scripts/db_utils.py` — Database utilities
-
-### Database
-- `db/init.sql` — Complete schema (tables, indexes, views)
-- `db/02-init-databases.sql` — Docker initialization script
-
-### Notebooks
-- `notebooks/analysis.ipynb` — Main analysis notebook (structure complete, awaiting data)
-
-### Tests
-- `tests/unit/test_sbb_parser.py` — Parser unit tests
-- `tests/unit/test_load_meteo.py` — MeteoSwiss parsing unit tests
-- `tests/integration/test_collect_sbb.py` — SBB collection integration tests
-- `tests/integration/test_load_meteo.py` — MeteoSwiss loading integration tests
-- `tests/integration/test_end_to_end.py` — End-to-end pipeline tests
-- `tests/integration/conftest.py` — Integration test fixtures
-- `tests/conftest.py` — Root test configuration
-- `tests/fixtures/2024-01-01_istdaten.csv` — Real SBB sample data
-- `tests/fixtures/ogd-smn_ber_t_historical_2020-2029.csv` — MeteoSwiss sample
-
-### Configuration
-- `docker-compose.yml` — PostgreSQL 15 + pgAdmin
-- `.github/copilot-instructions.md` — Detailed project specifications
-- `.github/progress.md` — This file
-- `pyproject.toml` — Python project metadata
-- `pytest.ini` — pytest configuration
-- `requirements.txt` — Python dependencies
-- `.gitignore` — Git ignore rules
+- [x] `.github/copilot-instructions.md`
+- [x] `README.md`
+- [x] `.github/FIXTURES.md`
+- [x] `.github/progress.md` (this file, consolidated)
 
 ---
 
 ## Summary Table
 
 | Phase | Task | Status | Notes |
-|-------|------|--------|-------|
-| 1 | Infrastructure Setup | ✅ | Docker, DB schema, environment ready |
-| 2 | SBB Collection Script | ✅ | Full pipeline, tested, crash-safe |
-| 2 | MeteoSwiss Collection Script | ✅ | Full pipeline, tested, crash-safe |
-| 2 | DB Reset Utility | ✅ | Safe, interactive, test-compatible |
-| 3 | Unit Tests | ✅ | Parser, timestamp, filtering |
-| 3 | Integration Tests | ⚠️ | Basic coverage, expandable |
-| 4 | Analysis Notebook | 🟡 | Skeleton ready, awaits data |
-| 5 | Documentation | 🟡 | This file + copilot-instructions.md |
-| 6 | Pipeline Execution | ⏳ | Ready to start data collection |
+|------|------|------|------|
+| 1 | Infrastructure Setup | ✅ | DB, Docker, config in place |
+| 2 | Data Collection Scripts | ✅ | SBB + Meteo + reset utility implemented |
+| 3 | Testing | ✅ | Unit + integration + e2e coverage present |
+| 4 | Analysis Notebook | ✅ | Sections 0-5 implemented, modeling + persistence present |
+| 5 | Documentation | ✅ | Core docs present and updated |
 
 ---
 
 ## Changelog
 
-### 2026-04-20 (Initial)
-- Created this progress tracking document
-- Documented completion of Phases 1–3 (Infrastructure, Scripts, Testing)
-- Outlined Phase 4 (Analysis) and Phase 5 (Next Steps)
-- All code scaffolding complete, awaiting data collection execution
+### 2026-04-21
+- Reviewed `notebooks/analysis.ipynb` section structure and key implemented features.
+- Marked Phase 4 as complete.
+- Replaced duplicated/contradictory historical blocks in progress tracking.
+- Consolidated this file into a single canonical status snapshot.
 
+### 2026-04-20
+- Initial project progress capture and phase breakdown.

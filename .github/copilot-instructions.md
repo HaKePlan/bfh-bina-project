@@ -45,6 +45,8 @@ notebook but not modelled.
 │   └── <module files>               # Supporting modules imported by the scripts
 ├── notebooks/
 │   └── analysis.ipynb               # The single Jupyter notebook for analysis
+├── models/
+│   └── .gitkeep                     # Trained model saved here after notebook Section 4 runs
 ├── tests/
 │   ├── unit/                        # Pure function tests, no DB, no network
 │   ├── integration/                 # Tests that require a running DB
@@ -436,48 +438,147 @@ python reset_db.py --database sbb_precipitation_test --yes
 The notebook is `notebooks/analysis.ipynb`. It connects to the database and
 assumes it is already fully populated by the collection scripts.
 
-The notebook must contain the following sections in order, each as a Markdown
-heading with code cells beneath it:
+**General rules for all sections:**
+- Every code block must be preceded by a narrative markdown cell explaining
+  what is being done and why — this is a study document, not just code.
+- Every chart must be followed by an interpretation markdown cell explaining
+  what the chart shows and what conclusion can be drawn.
+- All charts must have a title, labeled axes, and a legend where applicable.
+- Use seaborn for all statistical plots (boxplots, distributions, heatmaps)
+  with matplotlib for layout and customization.
+- Use the style set in Section 0 (`seaborn-v0_8-darkgrid`, `husl` palette)
+  consistently across all charts.
+- Assign a consistent color per station across all charts:
+  Zürich HB = blue, Basel SBB = red, Bern = green.
+- The notebook must run correctly against any amount of data — one month or
+  24 months — without any code changes.
+- All sections must be fully implemented with no TODOs left.
+- Commit the notebook with output cells cleared.
+
+The notebook must contain the following sections in order:
 
 ### 0. Setup
-- Import all libraries
-- Load DB connection from environment variables (same `.env` as the scripts)
-- Print row counts from `train_connections`, `precipitation_10min`, and `processing_log`
-  as a sanity check
+- Import all libraries: `pandas`, `numpy`, `matplotlib`, `seaborn`,
+  `scipy.stats`, `sklearn`, `joblib`, `dotenv`, `sqlalchemy`
+- Load DB connection from environment variables via `.env`
+- Create SQLAlchemy engine
+- Print row counts from `train_connections`, `precipitation_10min`, and
+  `processing_log` as a sanity check
 
 ### 1. Data Validation
-- Check for unexpected NULLs in critical columns
-- Distribution of `arrival_delay_min` (histogram): identify and discuss outliers
-- Distribution of `median_precip_mm`
-- Check coverage: how many connections have a non-null `median_precip_mm`
-- Check date range completeness: are there any missing months?
-- Flag and document any data quality issues found
+
+**NULL check:**
+- Check for NULLs in `arrival_delay_min`, `median_precip_mm`, `trip_duration_min`
+- Print counts and percentages
+
+**Arrival delay distribution:**
+- Plot a histogram of `arrival_delay_min` showing the full distribution
+- Do not cap or clip the values
+- Follow with an interpretation markdown cell that:
+  - States the mean, median, and 95th percentile delay
+  - Identifies what counts as an outlier (e.g. delays > 60 min) and how many
+    there are as a percentage of total
+  - Notes that outliers are kept in the dataset as they are valid measurements
+
+**Precipitation distribution:**
+- Plot a histogram of `median_precip_mm` (excluding NULLs)
+- Print coverage: percentage of connections with non-null `median_precip_mm`
+
+**Date range completeness:**
+- Query `processing_log` to show which months have been successfully loaded
+- Print a table of loaded months per station
+- Add a markdown note: "If months are missing, re-run `collect_sbb.py` for
+  those months. Results below are based on available data only."
+
+**Data quality summary:**
+- End Section 1 with a markdown cell summarising all findings and flagging
+  any issues to be aware of in the subsequent analysis
 
 ### 2. Exploratory Analysis
-- Arrival delay by station (boxplot per station)
-- Arrival delay by month (seasonality check)
-- Arrival delay by day of week
-- Precipitation distribution per city per month
-- Scatter plot: `median_precip_mm` vs `arrival_delay_min` per station
+
+All plots use the consistent station color scheme (Zürich=blue, Basel=red,
+Bern=green) and are followed by an interpretation markdown cell.
+
+- **Delay by station**: boxplot of `arrival_delay_min` per `destination_station`
+- **Delay by month**: line plot of median monthly delay per station
+  (only rendered if more than one month of data is available)
+- **Delay by day of week**: boxplot of `arrival_delay_min` per `day_of_week`
+- **Precipitation by city per month**: bar chart of mean `median_precip_mm`
+  per city per month (only rendered if more than one month is available)
+- **Scatter plot**: `median_precip_mm` vs `arrival_delay_min`, one subplot
+  per station, with a regression line overlay
 
 ### 3. Correlation Analysis
-- Pearson and Spearman correlation between `median_precip_mm` and `arrival_delay_min`
-  computed per station and overall
-- Correlation by precipitation category (dry / light / moderate / heavy)
-- Statistical significance (p-values reported for each correlation)
-- Discussion of findings and limitations
+
+- **Pearson and Spearman correlation table**: compute both coefficients and
+  their p-values using `scipy.stats` for each station and overall. Present
+  as a formatted pandas DataFrame table.
+- **Correlation heatmap**: seaborn heatmap of the correlation matrix. Annotate
+  cells with the coefficient value.
+- **Correlation by precipitation category**: compute mean delay per
+  `precip_category` (dry / light / moderate / heavy) per station. Present
+  as both a bar chart and a printed table.
+- **Interpretation markdown**: discuss statistical significance (p < 0.05
+  threshold), direction and strength of correlation, and any differences
+  between stations.
+- **Limitations markdown**: note that correlation does not imply causation,
+  that confounding variables are not controlled for, and that the single
+  predictor limits explanatory power.
 
 ### 4. Predictive Model
-- Feature: `median_precip_mm`
+
+**Data sufficiency check (must run before any modelling):**
+- Count the number of distinct months in `train_connections`
+- If fewer than 6 months are available, print the following warning and
+  skip all modelling code in this section entirely:
+  ```
+  ⚠️  Insufficient data for reliable model training.
+      Only {n} month(s) loaded — minimum 6 required.
+      Re-run this section after the full dataset is collected.
+  ```
+- If 6 or more months are available, proceed with the steps below.
+
+**Feature and target:**
+- Feature: `median_precip_mm` (drop NULLs before modelling)
 - Target: `arrival_delay_min`
-- Model: Linear Regression as baseline; Random Forest as comparison
-- Train/test split: 80/20, split by date (not random) to avoid data leakage
-- Evaluation metrics: MAE, RMSE, R²
-- Residual plot and prediction vs. actual plot
-- Discussion of model performance and limitations
+
+**Train/test split:**
+- Split 80/20 by date (temporal split — sort by `betriebstag`, take first
+  80% as train, last 20% as test). Never use random split to avoid data leakage.
+
+**Models:**
+- Linear Regression (scikit-learn) as baseline
+- Random Forest Regressor (scikit-learn) as comparison
+- Train both on the training set
+
+**Evaluation:**
+- Compute MAE, RMSE, and R² for both models on the test set
+- Print a comparison table of metrics for both models
+- Plot residuals for both models
+- Plot predicted vs actual for both models
+
+**Model selection and persistence:**
+- Automatically select the model with the lower RMSE on the test set
+- Save the winning model to `models/model.pkl` using `joblib.dump`
+- Save the model metadata (model type, RMSE, MAE, R², training date,
+  number of training samples) to `models/model_metadata.json`
+- Create the `models/` directory automatically if it does not exist
+- Print: `✓ Model saved: {model_type} (RMSE: {rmse:.3f})`
+- `models/*.pkl` and `models/*.json` must be added to `.gitignore`
+  so the trained model is not committed but the empty `models/` folder is
+  (add a `.gitkeep` file to `models/`)
+
+**Discussion markdown:**
+- Interpret the metrics in plain language
+- Acknowledge that R² will likely be low due to the single predictor
+- Note that the model is saved and ready for use in Phase 5
 
 ### 5. Conclusion
-- Summary of findings
+- Summary of findings from Sections 2, 3, and 4
+- Acknowledged limitations: single feature, confounders not modelled,
+  data quality caveats, MeteoSwiss station proximity to actual train route
+- Suggestions for further work (additional features, longer time range)
+- This section must be written as prose markdown cells, not code
 - Acknowledged limitations: single feature, confounders not modelled,
   data quality caveats, MeteoSwiss station proximity to actual train route
 - Suggestions for further work (additional features, longer time range)
@@ -578,6 +679,8 @@ Specifically:
 ```
 raw/
 logs/
+models/*.pkl
+models/*.json
 .env
 .env.test
 __pycache__/
