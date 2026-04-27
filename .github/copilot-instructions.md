@@ -61,7 +61,11 @@ following unless explicitly asked:
 ```
 .
 ├── .github/
-│   └── copilot-instructions.md
+│   ├── copilot-instructions.md
+│   └── workflows/
+│       └── app-ci.yml               # GitHub Actions: app tests + Docker build
+├── .streamlit/
+│   └── config.toml                  # Streamlit server and theme configuration
 ├── .gitignore                        # raw/ and .env must always be listed here
 ├── docker-compose.yml                # PostgreSQL + pgAdmin
 ├── db/
@@ -1063,6 +1067,32 @@ The README must include a **Phase 5 — Web Application** section with:
 3. Docker build and run commands
 4. Screenshot or description of what the app shows
 5. Disclaimer about model limitations (same text as the in-app footer)
+6. Live demo link (Streamlit Community Cloud URL)
+7. CI/CD explanation: GitHub Actions for testing, Streamlit Cloud for deployment
+
+### CI / CD
+
+**GitHub Actions (`.github/workflows/app-ci.yml`):**
+- Triggered on push and pull request to `main` when `app/`, `models/`, or the
+  workflow file itself changes.
+- Job `test`: installs `app/requirements.txt` + `pytest`, runs `pytest app/tests/ -v`.
+- Job `docker` (depends on `test`): builds the Docker image with
+  `docker build -f app/Dockerfile -t sbb-delay-app .`, starts the container,
+  and verifies the Streamlit health endpoint responds at
+  `http://localhost:8501/_stcore/health`.
+- Uses `actions/checkout@v4` and `actions/setup-python@v5` with pip caching.
+
+**Streamlit Community Cloud (deployment):**
+- The app is deployed via Streamlit Community Cloud, which watches the `main`
+  branch and auto-deploys on every push (~2 minutes).
+- One-time setup: connect the repo at [share.streamlit.io](https://share.streamlit.io),
+  set the main file path to `app/app.py`, and click Deploy.
+- No CI step is needed for deployment — Streamlit Cloud handles it directly.
+
+**Streamlit configuration (`.streamlit/config.toml`):**
+- `server.headless = true` — required for cloud deployment.
+- `browser.gatherUsageStats = false` — disables telemetry.
+- Theme colours are configured for visual consistency.
 
 ### `.gitignore` addition
 

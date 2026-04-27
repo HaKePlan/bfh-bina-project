@@ -11,7 +11,11 @@ Investigation of the correlation between precipitation and train delays at three
 ```
 .
 ├── .github/
-│   └── copilot-instructions.md     # Project guidelines
+│   ├── copilot-instructions.md     # Project guidelines
+│   └── workflows/
+│       └── app-ci.yml              # GitHub Actions: tests + Docker build
+├── .streamlit/
+│   └── config.toml                 # Streamlit server and theme config
 ├── db/
 │   ├── init.sql                    # Database schema
 │   └── 02-init-databases.sql       # Multi-database init script
@@ -378,6 +382,34 @@ The app is then accessible at `http://localhost:8501`.
 1. **7-Day Forecast** — Select a station and arrival time. The app fetches the real MeteoSwiss precipitation forecast via Open-Meteo and predicts the expected arrival delay for each of the next 7 days.
 
 2. **Manual Input** — Use a slider to set precipitation intensity and see the predicted delay for the selected station.
+
+### Live Demo
+
+The app is deployed online — no installation required:
+
+👉 **[sbb-delay-prediction.streamlit.app](https://sbb-delay-prediction.streamlit.app)**
+
+*(Replace the URL above with your actual Streamlit Cloud URL after deployment.)*
+
+### CI / CD
+
+The project uses **GitHub Actions** for continuous integration and
+**Streamlit Community Cloud** for continuous deployment.
+
+**GitHub Actions (`.github/workflows/app-ci.yml`):**
+- Runs `pytest app/tests/` on every push and pull request that touches `app/`
+- Builds the Docker image and verifies the container starts and passes a health check
+- Triggers automatically — no manual steps required
+
+**Streamlit Community Cloud (deployment):**
+- Watches the `main` branch — every push auto-deploys the app within ~2 minutes
+- One-time setup (already done or do once):
+  1. Go to [share.streamlit.io](https://share.streamlit.io) and sign in with GitHub.
+  2. Click **"New app"** and select this repository.
+  3. Set the **main file path** to `app/app.py`.
+  4. Click **"Deploy"**.
+
+**Result:** push to `main` → tests run in CI → Streamlit Cloud auto-deploys. Your teacher and peers always see the latest version at the public URL.
 
 ### Disclaimer
 
