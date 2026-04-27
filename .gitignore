@@ -201,3 +201,4 @@ raw/
 tests/fixtures/2024-01-01_istdaten.csv
 
 logs/
+skills-lock.json
