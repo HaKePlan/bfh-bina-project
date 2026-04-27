@@ -4,6 +4,8 @@ Investigation of the correlation between precipitation and train delays at three
 
 **Study period:** 2024–2025
 
+🔗 **[Live App](https://bfh-bina-project-r5jxe6szjtrjmkz7fnq9ae.streamlit.app)** · **[Analysis Notebook (Colab)](https://colab.research.google.com/github/HaKePlan/bfh-bina-project/blob/main/notebooks/analysis.ipynb)**
+
 ---
 
 ## Project Structure
@@ -102,6 +104,8 @@ python -m scripts.collect_sbb --start-year 2024 --end-year 2024 --months 1,2
 ```bash
 jupyter notebook notebooks/analysis.ipynb
 ```
+
+Or open directly in Google Colab: **[Open in Colab](https://colab.research.google.com/github/HaKePlan/bfh-bina-project/blob/main/notebooks/analysis.ipynb)**
 
 ---
 
@@ -387,9 +391,7 @@ The app is then accessible at `http://localhost:8501`.
 
 The app is deployed online — no installation required:
 
-👉 **[sbb-delay-prediction.streamlit.app](https://sbb-delay-prediction.streamlit.app)**
-
-*(Replace the URL above with your actual Streamlit Cloud URL after deployment.)*
+👉 **[bfh-bina-project-r5jxe6szjtrjmkz7fnq9ae.streamlit.app](https://bfh-bina-project-r5jxe6szjtrjmkz7fnq9ae.streamlit.app)**
 
 ### CI / CD
 
