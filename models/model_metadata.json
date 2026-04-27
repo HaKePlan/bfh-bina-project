@@ -3,7 +3,7 @@
   "MAE": 1.4617,
   "RMSE": 6.6101,
   "R2": -0.0,
-  "trained_at": "2026-04-27T10:18:24.224393+00:00",
+  "trained_at": "2026-04-27T12:48:28.505796+00:00",
   "n_training_samples": 3280279,
   "n_test_samples": 820070,
   "feature": "median_precip_mm",
