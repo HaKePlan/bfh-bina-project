@@ -1,0 +1,11 @@
+{
+  "model_type": "Random Forest",
+  "MAE": 1.4617,
+  "RMSE": 6.6101,
+  "R2": -0.0,
+  "trained_at": "2026-04-26T09:38:29.929388+00:00",
+  "n_training_samples": 3280279,
+  "n_test_samples": 820070,
+  "feature": "median_precip_mm",
+  "target": "arrival_delay_min"
+}
