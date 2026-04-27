@@ -2,7 +2,7 @@
 
 Does rain make Swiss trains late? This project investigates the correlation between precipitation and arrival delays at **Zürich HB**, **Basel SBB**, and **Bern** using SBB and MeteoSwiss data from 2022–2025.
 
-🔗 **[Live App](https://bfh-bina-project-r5jxe6szjtrjmkz7fnq9ae.streamlit.app)** · **[Analysis Notebook (Colab)](https://colab.research.google.com/github/HaKePlan/bfh-bina-project/blob/main/notebooks/analysis.ipynb)**
+🔗 **[Live App](https://bfh-bina-project-r5jxe6szjtrjmkz7fnq9ae.streamlit.app)** · **[Analysis Notebook (Colab)](https://colab.research.google.com/github/HaKePlan/bfh-bina-project/blob/main/notebooks/CaseStudy.ipynb)**
 
 ---
 
