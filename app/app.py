@@ -11,7 +11,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 import streamlit as st
 
 try:
-    from app.forecast import STATIONS, fetch_forecast, extract_precip_at_hour, build_forecast_table
+    from app.forecast import STATIONS, fetch_forecast, extract_precip_at_hour, build_forecast_table, get_sample_forecast
     from app.prediction import (
         load_model,
         convert_hourly_to_10min,
@@ -19,7 +19,7 @@ try:
         predict_delay,
     )
 except ImportError:
-    from forecast import STATIONS, fetch_forecast, extract_precip_at_hour, build_forecast_table
+    from forecast import STATIONS, fetch_forecast, extract_precip_at_hour, build_forecast_table, get_sample_forecast
     from prediction import (
         load_model,
         convert_hourly_to_10min,
@@ -64,14 +64,20 @@ def main():
     st.sidebar.header("Settings")
     station = st.sidebar.selectbox("Station", list(STATIONS.keys()))
     arrival_time = st.sidebar.time_input("Planned arrival time", value=time(8, 0))
+    demo_mode = st.sidebar.checkbox("Demo mode", value=False)
 
     station_info = STATIONS[station]
 
     # --- Section 1: 7-Day Forecast ---
     st.header(f"📅 7-Day Forecast — {station}")
+    if demo_mode:
+        st.info("🎭 Demo mode — using sample data with varied weather conditions.")
 
     try:
-        forecast_df = _fetch_cached_forecast(station_info["lat"], station_info["lon"])
+        if demo_mode:
+            forecast_df = get_sample_forecast(station)
+        else:
+            forecast_df = _fetch_cached_forecast(station_info["lat"], station_info["lon"])
         daily_df = extract_precip_at_hour(forecast_df, target_hour=arrival_time.hour)
 
         if daily_df.empty:
@@ -111,19 +117,9 @@ def _fetch_cached_forecast(lat: float, lon: float):
 
 
 def _display_forecast_table(table):
-    """Render the forecast table with today's row highlighted."""
-    import datetime
-
-    today_str = datetime.date.today().strftime("%d.%m.%Y")
-
-    def highlight_today(row):
-        if row["date"] == today_str:
-            return ["background-color: #fff3cd"] * len(row)
-        return [""] * len(row)
-
-    styled = table.style.apply(highlight_today, axis=1)
+    """Render the forecast table."""
     st.dataframe(
-        styled,
+        table,
         column_config={
             "alert": st.column_config.TextColumn("Alert", width="small"),
             "date": st.column_config.TextColumn("Date"),

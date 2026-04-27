@@ -2,6 +2,7 @@
 
 import requests
 import pandas as pd
+from datetime import datetime, timedelta
 
 try:
     from app.prediction import convert_hourly_to_10min, classify_precip_category, predict_delay
@@ -19,6 +20,39 @@ STATIONS = {
 }
 
 GERMAN_DAY_NAMES = {0: "Mo", 1: "Di", 2: "Mi", 3: "Do", 4: "Fr", 5: "Sa", 6: "So"}
+
+# Hourly precipitation patterns per station for demo mode (mm/h, 24 values per day).
+# Each station has 7 daily patterns covering all categories:
+# dry (0.0), light (0<x<3), moderate (3≤x<12), heavy (≥12).
+_SAMPLE_DAILY_PATTERNS = {
+    "Zürich HB": [
+        [0.0] * 24,                                                          # day 1: dry
+        [0.0]*6 + [1.2]*4 + [0.8]*4 + [1.5]*4 + [0.0]*6,                   # day 2: light
+        [0.0] * 24,                                                          # day 3: dry
+        [0.0]*6 + [5.0]*4 + [7.0]*4 + [4.0]*4 + [0.0]*6,                   # day 4: moderate
+        [0.0]*8 + [0.5]*8 + [0.0]*8,                                        # day 5: light
+        [0.0]*4 + [3.0]*4 + [15.0]*4 + [18.0]*4 + [12.0]*4 + [0.0]*4,      # day 6: heavy
+        [0.0] * 24,                                                          # day 7: dry
+    ],
+    "Basel SBB": [
+        [0.0]*8 + [0.3]*8 + [0.0]*8,                                        # day 1: light
+        [0.0] * 24,                                                          # day 2: dry
+        [0.0]*4 + [4.0]*6 + [6.0]*6 + [3.5]*4 + [0.0]*4,                   # day 3: moderate
+        [0.0] * 24,                                                          # day 4: dry
+        [0.0]*4 + [8.0]*4 + [14.0]*4 + [16.0]*4 + [13.0]*4 + [0.0]*4,      # day 5: heavy
+        [0.0]*6 + [2.0]*6 + [1.0]*6 + [0.0]*6,                             # day 6: light
+        [0.0] * 24,                                                          # day 7: dry
+    ],
+    "Bern": [
+        [0.0] * 24,                                                          # day 1: dry
+        [0.0] * 24,                                                          # day 2: dry
+        [0.0]*6 + [1.8]*6 + [2.5]*6 + [0.0]*6,                             # day 3: light
+        [0.0]*4 + [12.0]*4 + [16.0]*4 + [14.0]*4 + [13.0]*4 + [0.0]*4,     # day 4: heavy
+        [0.0]*6 + [4.5]*4 + [6.0]*4 + [5.0]*4 + [0.0]*6,                   # day 5: moderate
+        [0.0] * 24,                                                          # day 6: dry
+        [0.0]*8 + [0.6]*8 + [0.0]*8,                                        # day 7: light
+    ],
+}
 
 
 def fetch_forecast(lat: float, lon: float) -> pd.DataFrame:
@@ -82,3 +116,21 @@ def build_forecast_table(daily_df: pd.DataFrame, model) -> pd.DataFrame:
             "predicted_delay": f"+{delay:.1f} min",
         })
     return pd.DataFrame(rows)
+
+
+def get_sample_forecast(station_name: str) -> pd.DataFrame:
+    """Return a synthetic 7-day hourly forecast for demo mode.
+
+    Uses hardcoded precipitation patterns that cover all categories
+    (dry, light, moderate, heavy). Dates are relative to today.
+    """
+    patterns = _SAMPLE_DAILY_PATTERNS.get(
+        station_name, _SAMPLE_DAILY_PATTERNS["Zürich HB"]
+    )
+    today = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+    times = [today + timedelta(hours=h) for h in range(168)]
+    precip = []
+    for day_pattern in patterns:
+        precip.extend(day_pattern)
+    return pd.DataFrame({"time": pd.to_datetime(times), "precipitation": precip})
+

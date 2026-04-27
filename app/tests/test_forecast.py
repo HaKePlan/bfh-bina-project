@@ -5,7 +5,7 @@ from unittest.mock import patch, MagicMock
 import numpy as np
 import pandas as pd
 
-from app.forecast import fetch_forecast, extract_precip_at_hour, build_forecast_table
+from app.forecast import fetch_forecast, extract_precip_at_hour, build_forecast_table, get_sample_forecast
 
 
 class TestFetchForecast:
@@ -116,4 +116,44 @@ class TestBuildForecastTable:
 
         result = build_forecast_table(daily_df, model)
         assert result["predicted_delay"].iloc[0].startswith("+")
+
+
+class TestGetSampleForecast:
+    """Verify sample forecast data for demo mode."""
+
+    def test_returns_dataframe_with_expected_columns(self):
+        df = get_sample_forecast("Zürich HB")
+        assert isinstance(df, pd.DataFrame)
+        assert "time" in df.columns
+        assert "precipitation" in df.columns
+
+    def test_returns_168_rows(self):
+        df = get_sample_forecast("Basel SBB")
+        assert len(df) == 168  # 7 days × 24 hours
+
+    def test_dates_start_from_today(self):
+        import datetime
+
+        df = get_sample_forecast("Bern")
+        first_date = df["time"].iloc[0].date()
+        assert first_date == datetime.date.today()
+
+    def test_stations_have_different_data(self):
+        df_zurich = get_sample_forecast("Zürich HB")
+        df_basel = get_sample_forecast("Basel SBB")
+        assert not df_zurich["precipitation"].equals(df_basel["precipitation"])
+
+    def test_contains_all_precip_categories(self):
+        """Sample data should cover dry, light, moderate, and heavy."""
+        for station in ["Zürich HB", "Basel SBB", "Bern"]:
+            df = get_sample_forecast(station)
+            precip = df["precipitation"]
+            assert (precip == 0.0).any(), f"{station}: missing dry (0.0)"
+            assert ((precip > 0) & (precip < 3.0)).any(), f"{station}: missing light"
+            assert ((precip >= 3.0) & (precip < 12.0)).any(), f"{station}: missing moderate"
+            assert (precip >= 12.0).any(), f"{station}: missing heavy"
+
+    def test_unknown_station_returns_default(self):
+        df = get_sample_forecast("Unknown Station")
+        assert len(df) == 168
 
