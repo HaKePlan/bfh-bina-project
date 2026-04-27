@@ -6,7 +6,7 @@ This project is a Business Intelligence study that investigates the correlation
 between precipitation and train delays at three major Swiss railway stations:
 Zürich HB, Basel SBB, and Bern.
 
-The study covers the period 2024–2025 and is structured in two independent parts:
+The study covers the period 2022–2025 and is structured in three independent parts:
 
 **Data Collection (`scripts/`)**
 Two standalone CLI scripts written in Python that populate a PostgreSQL database.
@@ -25,7 +25,36 @@ as an expected limitation of the study. Confounding variables (day of week,
 public holidays, season, incidents, infrastructure works) are discussed in the
 notebook but not modelled.
 
+**Phase 5 — Web Application (`app/`)**
+A Streamlit application that loads the trained model and fetches the MeteoSwiss
+7-day precipitation forecast via the Open-Meteo API. It allows users to explore
+expected arrival delays per station based on real forecast data and manual input.
+The app has no database dependency — it only needs `models/model_all_data.pkl`
+and an internet connection. It is packaged as a Docker container.
+
 ---
+
+## Current Project State
+
+**Phases 1–4 are complete.** Do not modify, regenerate, or overwrite any of the
+following unless explicitly asked:
+- All scripts in `scripts/` (collect_sbb.py, load_meteo.py, reset_db.py, db_utils.py,
+  sbb_parser.py, precipitation.py)
+- The database schema in `db/init.sql`
+- The notebook `notebooks/analysis.ipynb`
+- All tests in `tests/`
+
+**Phase 5 is the current focus.** All new work happens inside `app/`.
+
+**Key facts about the completed analysis (do not contradict these):**
+- Dataset: 4,100,349 train connections, 45 months (January 2022 – March 2025)
+- Stations: Zürich HB, Basel SBB, Bern
+- Overall Spearman ρ = 0.074 (precipitation vs. arrival delay)
+- Winning model: Random Forest, RMSE=6.610, MAE=1.462, R²=–0.000
+- Saved model file: `models/model_all_data.pkl`
+- The precipitation effect is a threshold effect (dry vs. wet), not linear
+- The model takes `median_precip_mm` (10-min equivalent) as its single feature
+
 
 ## 2. Repository Structure
 
@@ -47,6 +76,11 @@ notebook but not modelled.
 │   └── analysis.ipynb               # The single Jupyter notebook for analysis
 ├── models/
 │   └── .gitkeep                     # Trained model saved here after notebook Section 4 runs
+├── app/
+│   ├── app.py                       # Streamlit application entry point
+│   ├── requirements.txt             # App-specific Python dependencies
+│   ├── Dockerfile                   # Container definition for the Streamlit app
+│   └── <module files>              # Supporting modules imported by app.py
 ├── tests/
 │   ├── unit/                        # Pure function tests, no DB, no network
 │   ├── integration/                 # Tests that require a running DB
@@ -60,10 +94,13 @@ notebook but not modelled.
 
 **Rules Copilot must always follow for the repository structure:**
 - `raw/` is never committed. It is created automatically by the scripts at runtime.
-- `.env` is never committed. It holds local DB credentials.
-- `raw/` and `.env` must always be present in `.gitignore`.
+- `.env` is never committed. It holds local dev DB credentials.
+- `.env.prod` is never committed. It holds production DB credentials used by the notebook.
+- `.env.test` is never committed. It holds test DB credentials used by integration tests.
+- `raw/`, `.env`, `.env.prod`, and `.env.test` must always be present in `.gitignore`.
 - Schema changes always go into `db/init.sql`, never inline in scripts or notebooks.
-- The notebook never imports from `scripts/`. It only connects to the database.
+- The notebook connects to the production DB via `.env.prod` — never `.env`.
+- The app (`app/`) never connects to any database.
 
 ---
 
@@ -682,6 +719,7 @@ logs/
 models/*.pkl
 models/*.json
 .env
+.env.prod
 .env.test
 __pycache__/
 *.pyc
@@ -690,3 +728,371 @@ __pycache__/
 dist/
 .ipynb_checkpoints/
 ```
+
+---
+
+## 10. Phase 5 — Streamlit Web Application
+
+### Purpose
+
+A Streamlit app that presents the trained delay prediction model to an end user.
+It fetches the real MeteoSwiss 7-day hourly precipitation forecast via the
+Open-Meteo API and converts it into predicted arrival delays per station.
+
+The app has **no database dependency**. It requires only:
+- `models/model_all_data.pkl` — the trained scikit-learn model
+- An internet connection to call the Open-Meteo API
+
+### Station Configuration
+
+```python
+STATIONS = {
+    "Zürich HB":  {"city": "Zürich",  "lat": 47.3779, "lon": 8.5403},
+    "Basel SBB":  {"city": "Basel",   "lat": 47.5476, "lon": 7.5898},
+    "Bern":       {"city": "Bern",    "lat": 46.9481, "lon": 7.4474},
+}
+```
+
+### Precipitation Category Scale
+
+Used for alert colour coding throughout the app. These thresholds match
+`db/init.sql` exactly and must not be changed:
+
+| Category | `median_precip_mm` range | Alert |
+|---|---|---|
+| dry      | = 0.000 mm               | 🟢    |
+| light    | > 0.000 and < 0.500 mm   | 🟡    |
+| moderate | ≥ 0.500 and < 2.000 mm   | 🟠    |
+| heavy    | ≥ 2.000 mm               | 🔴    |
+
+### Model Architecture Note
+
+The model takes `median_precip_mm` as its **single feature** — it has no
+station feature. This means the model returns the same predicted delay for
+the same precipitation value regardless of station. Station differentiation
+in the app comes from different weather forecasts per location (different
+lat/lon → different precipitation from Open-Meteo), not from different
+model behaviour per station.
+
+### Precipitation Unit Conversion
+
+The model was trained on `median_precip_mm` — the median of 10-minute
+precipitation sums over a trip window.
+
+The Open-Meteo API returns hourly precipitation (`precipitation` in mm/h).
+
+**Conversion:** divide the hourly value by 6 to obtain an approximate
+10-minute equivalent before passing it to the model.
+
+```python
+precip_10min = hourly_precip_mm_per_hour / 6.0
+```
+
+**Approximation note:** this divides a 1-hour sum by 6 to get an average
+10-minute portion. The training data used the *median* of actual 10-minute
+readings, not an average of an hourly total. This is a known approximation —
+there is no way to get 10-minute forecast granularity from Open-Meteo.
+
+This conversion must be applied consistently in both the forecast section
+and the manual input section. The UI must display both the raw hourly
+value (mm/h) and the converted value passed to the model (mm/10min)
+so the user understands the transformation.
+
+### Open-Meteo API
+
+**Endpoint:** `https://api.open-meteo.com/v1/forecast`
+
+**Parameters:**
+```
+latitude        = station latitude
+longitude       = station longitude
+hourly          = precipitation
+models          = meteoswiss_icon_ch2   (⚠️ verify this value — see implementation note below)
+forecast_days   = 7
+timezone        = Europe/Zurich
+```
+
+**Implementation prerequisite — verify model parameter:**
+Before writing any code, manually test the API call with
+`models=meteoswiss_icon_ch2`. If it returns an error, try `icon_ch` or omit
+the `models` parameter entirely. Store the working value as a `FORECAST_MODEL`
+constant in `forecast.py` so it is easy to change.
+
+**Response structure:**
+```json
+{
+  "hourly": {
+    "time": ["2024-01-01T00:00", "2024-01-01T01:00", ...],
+    "precipitation": [0.0, 0.1, ...]
+  }
+}
+```
+
+The `time` values are ISO 8601 strings in the specified timezone.
+Parse them with `pd.to_datetime()`.
+
+**Error handling:** if the API call fails (network error, HTTP error, timeout),
+display a clear error message in the app and do not crash. Always wrap API
+calls in try/except.
+
+**Caching:** cache the API response for 1 hour using `@st.cache_data(ttl=3600)`
+to avoid unnecessary API calls on every user interaction.
+
+### App Structure
+
+The app has two sections rendered in order on a single page.
+Both sections use the **sidebar-selected station** — the station selector
+applies globally to the entire app.
+
+---
+
+#### Section 1 — 7-Day Forecast View
+
+**Purpose:** show the user what delays to expect based on the real MeteoSwiss
+forecast for their planned arrival day and time.
+
+**User inputs (in the sidebar):**
+- Station selector: `st.selectbox` with options Zürich HB, Basel SBB, Bern
+  (applies to both Section 1 and Section 2)
+- Planned arrival time: `st.time_input` (HH:MM, default 08:00)
+
+**Processing:**
+1. Fetch 7-day hourly forecast for the selected station's coordinates.
+2. For each of the 7 forecast days, extract the hourly precipitation value
+   at the hour matching the user's planned arrival time.
+3. Convert to 10-min equivalent (÷ 6).
+4. Pass to model to get predicted delay in minutes.
+5. Derive precipitation category and alert emoji from the thresholds above.
+
+**Display:** a table or card layout showing one row per day:
+
+| Date | Day | Precip (mm/h) | Model input (mm/10min) | Alert | Predicted delay |
+|---|---|---|---|---|---|
+| 2024-01-15 | Mon | 1.2 mm/h | 0.20 mm/10min | 🟡 | +0.9 min |
+
+- Dates must be formatted as `DD.MM.YYYY` with the day name in German
+  (Mo, Di, Mi, Do, Fr, Sa, So).
+- Predicted delay must be shown as `+X.X min` with a `+` prefix.
+- The alert emoji column must be large and visually prominent.
+- Today's row must be visually highlighted (e.g. bold or background colour).
+
+---
+
+#### Section 2 — Manual Precipitation Input
+
+**Purpose:** let the user explore "what if" scenarios by entering their own
+precipitation value and seeing the predicted delay for the selected station.
+
+**User input:**
+- A slider or number input for precipitation intensity in **mm/h**
+  (range 0.0 to 20.0, step 0.1, default 0.0).
+- Label: `Precipitation intensity (mm/h)`
+- Below the input, show a helper text explaining the category scale:
+  ```
+  0 mm/h = dry  |  < 3 mm/h = light  |  3–12 mm/h = moderate  |  > 12 mm/h = heavy
+  ```
+  (These are the hourly equivalents of the 10-min thresholds × 6.)
+
+**Processing:**
+1. Convert user input to 10-min equivalent (÷ 6).
+2. Pass to model for the sidebar-selected station.
+3. Derive category and alert.
+
+**Display:** a single `st.metric` card (not a table) showing:
+- The alert emoji and precipitation category
+- The converted model input (mm/10min)
+- The predicted delay as `+X.X min`
+
+This is for the sidebar-selected station only. The model has no station
+feature, so showing all three stations would display identical values.
+
+---
+
+#### Footer / Disclaimer
+
+At the bottom of the page, always display:
+
+```
+⚠️ This prediction is based on a single-predictor model (R² ≈ 0.000).
+Precipitation explains less than 0.25% of delay variance.
+This tool indicates a general trend only — not a precise per-trip forecast.
+Hourly forecast precipitation is divided by 6 as an approximation of the
+10-minute input the model expects.
+Data source: MeteoSwiss ICON CH2 via Open-Meteo (open-meteo.com).
+Model trained on SBB Istdaten 2024–2025.
+```
+
+---
+
+### Model Loading
+
+Load the model once at startup using `@st.cache_resource`:
+
+```python
+@st.cache_resource
+def load_model():
+    import joblib
+    from pathlib import Path
+    model_path = Path(__file__).parent.parent / "models" / "model_all_data.pkl"
+    return joblib.load(model_path)
+```
+
+**Important:** the app must be run from the project root directory:
+```bash
+streamlit run app/app.py
+```
+Running `cd app && streamlit run app.py` will fail because the model path
+resolves relative to `app.py`'s location. This is documented in the README.
+
+If the model file does not exist, display a clear error:
+```
+Model file not found at models/model_all_data.pkl.
+Run the analysis notebook (Section 4) first to train and save the model.
+```
+
+### Import Strategy
+
+Because the entry point is named `app.py` inside an `app/` package, Streamlit's
+runtime causes the filename to shadow the package name. To support both
+Streamlit runtime and pytest (which resolves `app` as a package), all cross-module
+imports use a try/except pattern:
+
+```python
+try:
+    from app.prediction import convert_hourly_to_10min   # pytest
+except ImportError:
+    from prediction import convert_hourly_to_10min        # streamlit run
+```
+
+Additionally, `app.py` injects its own directory onto `sys.path` at startup:
+```python
+sys.path.insert(0, str(Path(__file__).parent))
+```
+
+### Null Precipitation in Forecasts
+
+The Open-Meteo API returns `null` for precipitation values in the tail end of
+the 7-day forecast window (typically the last ~48 hours). These are converted
+to `0.0` via `fillna(0.0)` in `fetch_forecast()`. The `build_forecast_table()`
+function also coerces values with `float(value or 0.0)` as a safety measure.
+
+### File Size and Modularity
+
+Follow the same modularity rules as the scripts (Section 9):
+- `app.py` — Streamlit layout only, no business logic
+- `forecast.py` — Open-Meteo API call, caching, response parsing
+- `prediction.py` — model loading, precipitation conversion, delay prediction,
+  category classification
+- No file should exceed ~150 lines
+
+### Testing (TDD)
+
+All app business logic must be developed using test-driven development
+(red-green-refactor). Write failing tests first, then implement.
+
+App tests live in `app/tests/` (not `tests/unit/`) so they can be run
+independently from the pipeline tests which take several minutes:
+
+```bash
+# App tests only (~0.3s)
+pytest app/tests/
+
+# Pipeline tests only (~90s)
+pytest tests/unit/
+
+# All tests
+pytest tests/ app/tests/
+```
+
+**`app/tests/test_prediction.py`** — tests for `app/prediction.py`:
+- `convert_hourly_to_10min()` — verify division by 6 for known values
+- `classify_precip_category()` — verify all 4 categories and boundary values
+  (0.0, 0.499, 0.5, 1.999, 2.0)
+- `predict_delay()` — mock the model, verify it calls `model.predict()`
+  with the correct shaped input and returns a float
+- `load_model()` — verify `FileNotFoundError` when model file is missing
+
+**`app/tests/test_forecast.py`** — tests for `app/forecast.py`:
+- `fetch_forecast()` — mock `requests.get` with a sample JSON response,
+  verify returned DataFrame has `time` and `precipitation` columns
+- `extract_precip_at_hour()` — create a synthetic DataFrame with 168 hourly
+  rows (7 days × 24 hours), verify filtering to 7 rows at the target hour
+- `build_forecast_table()` — mock model + synthetic forecast data, verify
+  output DataFrame has expected columns (date, day name, precip, alert, delay)
+
+All tests must have no external dependencies (no network, no model file on
+disk). Use `unittest.mock` or `pytest` fixtures for mocking.
+
+### Docker
+
+**`app/Dockerfile`:**
+```dockerfile
+FROM python:3.11-slim
+WORKDIR /app
+COPY app/requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+COPY app/ ./app/
+COPY models/model_all_data.pkl ./models/
+EXPOSE 8501
+CMD ["streamlit", "run", "app/app.py", \
+     "--server.port=8501", \
+     "--server.address=0.0.0.0", \
+     "--server.headless=true"]
+```
+
+**Build and run:**
+```bash
+# Build
+docker build -f app/Dockerfile -t sbb-delay-app .
+
+# Run
+docker run -p 8501:8501 sbb-delay-app
+```
+
+The app is then accessible at `http://localhost:8501`.
+
+**Important:** the `models/model_all_data.pkl` file must exist before building
+the Docker image. The Dockerfile copies it from the project root's `models/`
+directory. The README must document this prerequisite clearly.
+
+### README additions
+
+The README must include a **Phase 5 — Web Application** section with:
+1. Prerequisites: model file must be trained first (run notebook Section 4)
+2. Local run without Docker: `streamlit run app/app.py`
+3. Docker build and run commands
+4. Screenshot or description of what the app shows
+5. Disclaimer about model limitations (same text as the in-app footer)
+
+### `.gitignore` addition
+
+`models/model_all_data.pkl` is already gitignored via `models/*.pkl`.
+No additional entries needed for the app.
+
+### Implementation Plan (ordered steps)
+
+1. **Verify Open-Meteo API model parameter.** `curl` or browser-test
+   `models=meteoswiss_icon_ch2`. If it fails, use `icon_ch` or omit.
+   Store result as `FORECAST_MODEL` constant.
+
+2. **TDD: `app/prediction.py`** — write `tests/unit/test_prediction.py`
+   first (red), then implement (green), then refactor. Functions:
+   `convert_hourly_to_10min`, `classify_precip_category`, `predict_delay`,
+   `load_model`.
+
+3. **TDD: `app/forecast.py`** — write `tests/unit/test_forecast.py`
+   first (red), then implement (green), then refactor. Functions:
+   `fetch_forecast`, `extract_precip_at_hour`, `build_forecast_table`.
+   Constants: `STATIONS`, `FORECAST_MODEL`, `API_ENDPOINT`.
+
+4. **Create `app/app.py`** — Streamlit layout wiring only (~100 lines).
+   Sidebar inputs, Section 1 forecast table, Section 2 metric card,
+   footer disclaimer.
+
+5. **Create `app/requirements.txt`** — `streamlit`, `pandas`, `requests`,
+   `joblib`, `scikit-learn`, `numpy`.
+
+6. **Create `app/Dockerfile`** — per spec above.
+
+7. **Update `README.md`** — add Phase 5 section with prerequisites, local
+   run command (from project root), Docker build/run, description, disclaimer.

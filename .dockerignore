@@ -1,0 +1,38 @@
+# Test files
+app/tests/
+tests/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+
+# Environment files
+.env
+.env.prod
+.env.test
+
+# Dev/build artifacts
+.git/
+.github/
+.gitignore
+.pytest_cache/
+*.egg-info/
+dist/
+logs/
+raw/
+notebooks/
+scripts/
+db/
+sbb_precipitation_analysis.egg-info/
+
+# IDE
+.idea/
+.vscode/
+
+# Documentation
+README.md
+pyproject.toml
+pytest.ini
+docker-compose.yml
+
