@@ -315,7 +315,7 @@ into `precipitation_10min`, then delete the files (unless `--debug`).
    c. Derive `city` from `station_abbr` using `METEO_STATIONS`.
    d. Parse `reference_timestamp` to a Python `datetime`.
    e. Rename `rre150z0` to `precip_mm`.
-   f. Filter to rows where the year is between 2024 and 2025 inclusive.
+   f. Filter to rows where the year is between 2022 and 2025 inclusive.
    g. Bulk-insert into `precipitation_10min` using upsert on `(station_abbr, measured_at)`.
    h. Log the result to `processing_log`.
    i. Delete the CSV file unless `--debug`.
@@ -923,7 +923,7 @@ This tool indicates a general trend only — not a precise per-trip forecast.
 Hourly forecast precipitation is divided by 6 as an approximation of the
 10-minute input the model expects.
 Data source: MeteoSwiss ICON CH2 via Open-Meteo (open-meteo.com).
-Model trained on SBB Istdaten 2024–2025.
+Model trained on SBB Istdaten 2022–2025.
 ```
 
 ---

@@ -36,7 +36,7 @@ This tool indicates a general trend only — not a precise per-trip forecast.
 Hourly forecast precipitation is divided by 6 as an approximation of the
 10-minute input the model expects.
 Data source: MeteoSwiss ICON CH2 via Open-Meteo (open-meteo.com).
-Model trained on SBB Istdaten 2024–2025.
+Model trained on SBB Istdaten 2022–2025.
 """
 
 
