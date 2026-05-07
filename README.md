@@ -40,7 +40,7 @@ pip install -r scripts/requirements.txt
 
 # 4. Load data
 python -m scripts.load_meteo
-python -m scripts.collect_sbb --start-year 2024 --end-year 2025
+python -m scripts.collect_sbb --start-year 2022 --end-year 2025
 
 # 5. Run the notebook
 jupyter notebook notebooks/analysis.ipynb

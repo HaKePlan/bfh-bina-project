@@ -3,7 +3,7 @@
 CLI script to download SBB monthly archives, extract daily CSVs, and populate train_connections.
 
 Usage:
-    python collect_sbb.py --start-year 2024 --end-year 2025 [--months 1,2,3] [--debug]
+    python collect_sbb.py --start-year 2022 --end-year 2025 [--months 1,2,3] [--debug]
 """
 
 import argparse
@@ -253,7 +253,7 @@ def main():
         "--start-year",
         type=int,
         required=True,
-        help="First year to process (e.g. 2024)"
+        help="First year to process (e.g. 2022)"
     )
     parser.add_argument(
         "--end-year",

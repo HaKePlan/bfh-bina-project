@@ -50,7 +50,7 @@ METEO_URLS = {
 }
 
 RAW_DIR = "raw/meteo"
-MIN_YEAR = 2024
+MIN_YEAR = 2022
 MAX_YEAR = 2025
 
 
@@ -90,7 +90,7 @@ def parse_meteo_csv(csv_content: bytes, station_abbr: str) -> list:
     """
     Parse MeteoSwiss CSV and return list of dicts for insertion.
 
-    Filters to years 2024-2025 and extracts:
+    Filters to years 2022-2025 and extracts:
     - reference_timestamp (DD.MM.YYYY HH:MM) → measured_at (UTC TIMESTAMP)
     - rre150z0 → precip_mm (10-minute precipitation in mm)
     """
