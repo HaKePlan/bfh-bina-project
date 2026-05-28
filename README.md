@@ -4,6 +4,8 @@ Does rain make Swiss trains late? This project investigates the correlation betw
 
 🔗 **[Live App](https://bfh-bina-project-r5jxe6szjtrjmkz7fnq9ae.streamlit.app)** · **[Analysis Notebook (Colab)](https://colab.research.google.com/github/HaKePlan/bfh-bina-project/blob/main/notebooks/case_study.ipynb)**
 
+⏯️ Presentation and Video: **[Slides](./docs/presentation.pdf)** · **[Video](./docs/Videopitch_BINA.mp4)**
+
 ---
 
 ## Key Findings
